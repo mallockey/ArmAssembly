@@ -48,6 +48,25 @@ ldr dst
 
 ## Store Operations
 
-Store data
+Store data from register to memory
 
 `str src, [dst]`
+
+Take was in `src` and store it into the memory address that `dst` points to (assuming here that `dst` is an address, can't use a literal value here)
+
+## ARM Multiple Operations
+
+Store multiples
+
+`ldm src, {regList}`
+
+Loads multiple into registers
+
+```
+ldr r0, = mydata
+ldm r0, {r1,r2,r3,r4,r5,r6,r7,r8}
+
+.section .data
+mydata:
+    .word 1,2,3,4,5,6,7,8
+```
