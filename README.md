@@ -1,4 +1,4 @@
-# ARM Assembly
+# ARM Assembly Basics
 
 ## Registers
 
