@@ -7,6 +7,11 @@ _start:
         bl foo
         mov r0, r0
 
+        // Exit syscall
+        mov r7, #1
+        mov r0, #0
+        svc #0
+
 foo:
         push {r4-r11, lr}
         sub sp, sp, #32
