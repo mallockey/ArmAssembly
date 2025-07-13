@@ -12,6 +12,7 @@ _main:
     b _main
 
 // Display
+
 display_prompt:
     push {lr}
     ldr r0, =shell_prompt
@@ -57,16 +58,35 @@ _read_input:
     pop {r0-r2, pc}
 
 _fork:
-    push {r0, r2, lr}
     mov r7, #2
     svc #0
+    cmp r0, #0
+    beq _prepare_construct_command
+    bne _wait
 
+_wait:
+    ldr r1, =child_status
+    mov r7, #7
+    svc #0
+
+    bl _print_newline
+    b _main
+
+_print_newline:
+    push {lr}
+    mov r0, #1
+    ldr r1, =new_line
+    mov r2, #1          @ Just 1 byte: '\n'
+    mov r7, #4
+    svc #0
+    pop {pc}
+
+
+_prepare_construct_command:
     ldr r0, =command_to_run
     ldr r1, =command_prepend
     mov r2, #0
-    
     b _construct_command
-    pop {r0-r2, pc}
 
 _construct_command:
     ldrb r3, [r1, r2]
@@ -83,37 +103,63 @@ _setup_user_input:
 
 _add_user_input:
     ldrb r3, [r1, r4]
-    cmp r3, #0
+    cmp r3, #0     // null terminated
     beq _call_the_command
-    cmp r3, #10
+
+    cmp r3, #10     // new line
     beq _call_the_command
+
+    cmp r3, #32 // space (look for arguments)
+    beq _get_arguments
+
     strb r3, [r0, r2]
     add r2, r2, #1
     add r4, r4, #1
     b _add_user_input
 
+_get_arguments:
+    ldr r1, =arguments
+    ldr r4, =#0
+    b _add_user_arguments
+
+_add_user_arguments:
+    ldrb r3, [r1, r4]
+    cmp r3, #0     // null terminated
+    beq _call_the_command
+
+    cmp r3, #10     // new line
+    beq _call_the_command
+    
+    strb r3, [r0, r2]
+    add r4, r4, #1
+    b _add_user_arguments
+
+
 _call_the_command:
     ldr r0, =command_to_run
-    mov r1, #0
+    ldr r1, =arguments
     mov r2, #0
     mov r7, #11
     svc #0
-    b _main
+    b _exit
 
 _exit:
     mov r7, #1
     mov r0, #0
     svc #0
 
-
 .section .data
     shell_prompt:
         .asciz "$/"
-    
+
     command_prepend:
         .asciz "/bin/"
+        
+    new_line:
+        .asciz "\n"
 
 .section .bss
+
 .global input
 .align 4
 input:
@@ -123,3 +169,18 @@ input:
 .align 4
 command_to_run:
     .skip 256
+
+.global arguments
+.align 4
+arguments:
+    .skip 256
+
+.global child_status
+.align 4
+child_status:
+    .skip 4
+
+.global child_process_id
+.align 4
+child_process_id:
+    .skip 4
