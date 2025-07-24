@@ -76,16 +76,16 @@ _print_newline:
     push {lr}
     mov r0, #1
     ldr r1, =new_line
-    mov r2, #1          @ Just 1 byte: '\n'
+    mov r2, #1          
     mov r7, #4
     svc #0
     pop {pc}
 
 
 _prepare_construct_command:
-    ldr r0, =command_to_run
-    ldr r1, =command_prepend
-    mov r2, #0
+    ldr r0, =command_to_run // The command we will build from the user
+    ldr r1, =command_prepend // /bin/
+    mov r2, #0 // This is the counter for the the input string as we build up /bin/ + ls
     b _construct_command
 
 _construct_command:
@@ -97,7 +97,7 @@ _construct_command:
     b _construct_command
 
 _setup_user_input:
-    ldr r1, =input
+    ldr r1, =input // The Input the user submitted
     ldr r4, =#0
     b _add_user_input
 
@@ -118,30 +118,67 @@ _add_user_input:
     b _add_user_input
 
 _get_arguments:
-    ldr r1, =arguments
-    ldr r4, =#0
+    ldr r8, =arg_array
+    ldr r9, =command_to_run
+    str r9, [r8]        @ arg_array[0] = command_to_run
+    mov r5, #4          @ offset to arg_array[1]
+
+    add r4, r4, #1
+    ldr r0, =arguments
+    ldr r2, =#0
+    add r6, r0, r2   @ r6 = &arguments[r2], the start of this next string
+
     b _add_user_arguments
 
 _add_user_arguments:
     ldrb r3, [r1, r4]
+
+    cmp r3, #32 // space (look for arguments)
+    beq _add_argument_to_string_pointer
+
     cmp r3, #0     // null terminated
-    beq _call_the_command
+    beq _add_argument_to_string_pointer
 
     cmp r3, #10     // new line
-    beq _call_the_command
-    
+    beq _add_argument_to_string_pointer
+
     strb r3, [r0, r2]
     add r4, r4, #1
+    add r2, r2, #1
     b _add_user_arguments
 
 
+_add_argument_to_string_pointer:
+    mov r7, #0
+    strb r7, [r0, r2]     @ null-terminate the string
+    ldr r8, =arg_array
+    str r6, [r8, r5]      @ store start address into array
+
+    add r2, r2, #1        @ move past null byte
+    add r5, r5, #4        @ next pointer slot
+    add r6, r0, r2        @ update r6 to new string start
+
+    cmp r3, #0
+    beq _call_the_command
+    cmp r3, #10
+    beq _call_the_command
+
+    add r4, r4, #1        @ advance input pointer
+    b _add_user_arguments
+
 _call_the_command:
+    ldr r8, =arg_array
+    mov r7, #0
+    str r7, [r8, r5]     @ null-terminate the pointer array
+
     ldr r0, =command_to_run
-    ldr r1, =arguments
+    ldr r1, =arg_array
     mov r2, #0
     mov r7, #11
     svc #0
-    b _exit
+
+    b _main
+
 
 _exit:
     mov r7, #1
@@ -180,7 +217,7 @@ arguments:
 child_status:
     .skip 4
 
-.global child_process_id
+.global arg_array
 .align 4
-child_process_id:
-    .skip 4
+arg_array: 
+    .skip 40
